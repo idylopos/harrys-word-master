@@ -1,0 +1,13 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {parseList,isCorrect,schedule,buildQueue} from '../dist/core.js';
+import {initialText} from '../dist/vocabulary.js';
+const words=parseList(initialText).words;
+test('all 120 supplied words and 4 chapter headings parse without dropped lines',()=>{assert.equal(words.length,120);assert.equal(parseList(initialText).skipped.length,0);for(const chapter of [7,8,9,10])assert.equal(words.filter(w=>w.chapter===`Chapter ${chapter}`).length,30);assert.equal(words.find(w=>w.english==='peer').korean,'1. 또래, 친구, 2.동료');});
+test('any listed meaning, optional parentheses, spacing and punctuation work',()=>{for(const [english,answer] of [['trim','다듬다'],['trim','손질하다'],['grab','먹다'],['roast','볶다'],['condition','조건'],['by oneself','혼자힘으로'],['sew','을 꿰매다']])assert.equal(isCorrect(answer,words.find(w=>w.english===english),'en-ko'),true,english);assert.equal(isCorrect('다듬',words.find(w=>w.english==='trim'),'en-ko'),false);assert.equal(isCorrect('TRIM.',words.find(w=>w.english==='trim'),'ko-en'),true);assert.equal(isCorrect('',words[0],'en-ko'),false);});
+test('imports plain text, CSV, TSV, multi-word entries and flags malformed rows',()=>{const result=parseList('English,Korean\nCHAP.11\nask for,"요청하다, 부탁하다"\ntrim\t다듬다\nset up 1. 설치하다 2. 준비하다\nbad row\ntrim\t다듬다');assert.equal(result.words.length,3);assert.equal(result.words[0].korean,'요청하다, 부탁하다');assert.equal(result.skipped.length,2);});
+test('successful due reviews expand through 1,3,7,14,30,60,90 days',()=>{let now=1000000,p;for(const days of [1,3,7,14,30,60,90,90]){p=schedule(p,true,now);assert.equal(p.due-now,days*86400000);now=p.due;}});
+test('missed cards reset to ten minutes then restart at one day',()=>{const p=schedule({level:4,due:0},false,1000000);assert.equal(p.due,1600000);assert.equal(p.level,-1);const next=schedule(p,true,p.due);assert.equal(next.level,0);assert.equal(next.due-p.due,86400000);});
+test('early correct practice cannot advance a scheduled card',()=>{const p={level:2,due:9999999};assert.equal(schedule(p,true,100).due,p.due);assert.equal(schedule(p,true,100).level,2);});
+test('queue puts due reviews before new cards and excludes future reviews',()=>{const cards=[{key:'future'},{key:'new'},{key:'due'}],p={future:{due:500},due:{due:50}};assert.deepEqual(buildQueue(cards,p,10,100).map(c=>c.key),['due','new']);assert.equal(buildQueue(cards,p,10,100,true).length,3);assert.equal(buildQueue(cards,p,1,100)[0].key,'due');});
+test('English and Korean directions keep independent schedules',()=>{const p={'trim/en-ko':schedule(undefined,true,100)};assert.deepEqual(buildQueue([{key:'trim/en-ko'},{key:'trim/ko-en'}],p,10,200).map(c=>c.key),['trim/ko-en']);});

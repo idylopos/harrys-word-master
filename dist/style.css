@@ -41,3 +41,6 @@
   .breadcrumb{display:none}header{justify-content:flex-end}.nav{font-size:11px;gap:4px}.nav>span:first-child{font-size:17px}.section-heading h2{font-size:17px}.intro h1{font-size:26px}.prompt h2{font-size:44px}.prompt h2.korean{font-size:29px}
 }
 @media(prefers-reduced-motion:reduce){*{transition:none!important;scroll-behavior:auto!important}}
+
+.import-words{max-height:300px;overflow:auto;margin-top:8px}.import-words .word-row{font-size:13px}#import-preview summary{cursor:pointer;padding:8px 0}#import-preview .warning{margin:8px 0}
+@media(max-width:690px){.import-words .word-row{font-size:15px}#import-preview summary{min-height:44px;padding:10px 0}}

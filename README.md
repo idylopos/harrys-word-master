@@ -28,7 +28,7 @@ npm test
 
 ## Weekly imports and persistence
 
-Paste a list or upload a UTF-8 TXT, CSV, or TSV file. Use one English word/phrase and its Korean meanings per line. Optional headings include `CHAPTER 7` or `CHAP.8`. Review the parsed word count and skipped-line report before saving.
+Paste a list or upload a UTF-8 TXT, CSV, TSV, or Markdown file. Plain English–Korean lines, Markdown tables, and vertically copied extraction tables are supported. Optional numbers, parts of speech, empty table cells, and table rules are ignored. Optional headings include `CHAPTER 7` or `CHAP.8`. Expand “Review recognized words” to check the actual word–meaning pairs, and check skipped notes or incomplete entries before saving. Paragraphs explaining the extraction are not vocabulary. For the most reliable photo extraction, request one `English word Korean meanings` entry per line, without tables, numbers, parts of speech, pronunciation, examples, or explanatory prose.
 
 Vocabulary, statistics, and schedules are stored in localStorage for this browser and origin. They do not sync across devices. Export a JSON backup from the footer and restore it on another device or on the published app. Restoring replaces the current local data after confirmation. Clearing browser storage removes this data.
 

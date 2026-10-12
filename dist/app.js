@@ -1,5 +1,5 @@
 import { initialText } from './vocabulary.js';
-import { parseList, isCorrect, schedule, buildQueue, meanings } from './core.js';
+import { parseList, isCorrect, schedule, buildQueue, meanings } from './core.js?v=3';
 const $ = s => document.querySelector(s);
 const escape = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const storageKey = 'harry-word-master-v1';
@@ -83,7 +83,11 @@ function renderReview() {
  $('#due-round').onclick=startDueRound;
 }
 function startDueRound(){const cards=allCards(true).filter(c=>state.progress[c.key]?.due<=Date.now());const size=$('#session-size').value;queue=buildQueue(cards,state.progress,size==='all'?cards.length:Number(size));position=0;results=[];switchView('practice');renderQuestion();}
-function previewImport(){const {words,skipped}=parseList($('#list-text').value);$('#import-preview').innerHTML=`${words.length} words found${skipped.length?` · <span class="warning">${skipped.length} unrecognized or duplicate lines will be skipped.</span><details><summary>View skipped lines</summary>${skipped.map(s=>`Line ${s.line}: ${escape(s.text)}`).join('<br>')}</details>`:''}`;return {words,skipped};}
+function previewImport(){
+  const {words,skipped}=parseList($('#list-text').value);
+  $('#import-preview').innerHTML=`<strong>${words.length} words found</strong>${words.length?`<details><summary>Review recognized words (${words.length})</summary><div class="import-words">${words.map(w=>`<div class="word-row"><strong>${escape(w.english)}</strong><span lang="ko">${escape(w.korean)}</span></div>`).join('')}</div></details>`:''}${skipped.length?`<p class="warning">${skipped.length} notes, unrecognized lines, or duplicates will be skipped.</p><details><summary>View skipped lines</summary>${skipped.map(s=>`Line ${s.line}: ${escape(s.text)}`).join('<br>')}</details>`:''}`;
+  return {words,skipped};
+}
 function openUpload(){$('#upload-dialog').showModal();$('#list-name').focus();}
 function exportBackup(){const blob=new Blob([JSON.stringify(state,null,2)],{type:'application/json'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='harry-vocabulary-backup.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
 function validateBackup(value){return value&&Array.isArray(value.lists)&&value.lists.length>0&&value.lists.every(l=>typeof l.id==='string'&&typeof l.name==='string'&&Array.isArray(l.words)&&l.words.length&&l.words.every(w=>['id','english','korean','chapter'].every(k=>typeof w[k]==='string')))&&value.progress&&typeof value.progress==='object'&&Object.values(value.progress).every(p=>p&&Number.isFinite(p.due)&&Number.isInteger(p.level)&&p.level>=-1&&p.level<=6)&&['attempts','correct','streak','best'].every(k=>Number.isFinite(value[k])&&value[k]>=0);}

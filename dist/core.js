@@ -119,3 +119,21 @@ export function buildQueue(cards, progress, limit, now = Date.now(), early = fal
   const later = early ? shuffle(cards.filter(c => progress[c.key]?.due > now)) : [];
   return [...due, ...fresh, ...later].slice(0, limit);
 }
+
+// Keep the existing list/word/direction keys so old review schedules stay intact.
+export function resolveSelectedListIds(state) {
+  const available = new Set(state.lists.map(list => list.id));
+  const requested = Array.isArray(state.selectedListIds) ? state.selectedListIds : [state.selected];
+  const selected = [...new Set(requested)].filter(id => available.has(id));
+  return selected.length ? selected : state.lists.slice(0, 1).map(list => list.id);
+}
+export function chapterKey(listId, chapter) {
+  return JSON.stringify([listId, chapter]);
+}
+export function cardsForLists(lists, listIds, { chapters = null, direction = 'mixed' } = {}) {
+  const selected = new Set(listIds), includedChapters = chapters === null ? null : new Set(chapters);
+  return lists.filter(list => selected.has(list.id)).flatMap(list => list.words
+    .filter(word => includedChapters === null || includedChapters.has(chapterKey(list.id, word.chapter)))
+    .flatMap(word => ['en-ko', 'ko-en'].filter(d => direction === 'mixed' || d === direction)
+      .map(d => ({ word, direction: d, key: `${list.id}/${word.id}/${d}`, listId: list.id, listName: list.name }))));
+}

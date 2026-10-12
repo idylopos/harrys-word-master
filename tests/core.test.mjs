@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {parseList,isCorrect,schedule,buildQueue} from '../dist/core.js';
+import {parseList,isCorrect,schedule,buildQueue,resolveSelectedListIds,chapterKey,cardsForLists} from '../dist/core.js';
 import {initialText} from '../dist/vocabulary.js';
 const words=parseList(initialText).words;
 test('all 120 supplied words and 4 chapter headings parse without dropped lines',()=>{assert.equal(words.length,120);assert.equal(parseList(initialText).skipped.length,0);for(const chapter of [7,8,9,10])assert.equal(words.filter(w=>w.chapter===`Chapter ${chapter}`).length,30);assert.equal(words.find(w=>w.english==='peer').korean,'1. 또래, 친구, 2.동료');});
@@ -46,4 +46,40 @@ test('does not link an incomplete vertical word to the next numbered entry or ch
   assert.deepEqual(result.words.map(w=>w.english),['perform','trim']);
   assert.equal(result.words[1].chapter,'Chapter 12');
   assert.equal(result.skipped.length,3);
+});
+
+const testLists = [
+  {id:'day-11',name:'Day 11',words:parseList('manage 운영하다\nfirm 회사').words},
+  {id:'day-12',name:'Day 12',words:parseList('ride 타다\nfirm 단단한').words},
+  {id:'day-13',name:'Day 13',words:parseList('outside 밖에').words}
+];
+test('migrates old single-list selections and restores multiple selections without touching progress',()=>{
+  const old={lists:testLists,selected:'day-12',progress:{'day-12/My words:ride/en-ko':{due:900,level:3}}};
+  const original=JSON.stringify(old);
+  assert.deepEqual(resolveSelectedListIds(old),['day-12']);
+  assert.equal(JSON.stringify(old),original);
+  assert.deepEqual(resolveSelectedListIds({...old,selectedListIds:['day-11','day-12','day-11','missing']}),['day-11','day-12']);
+  assert.deepEqual(resolveSelectedListIds({...old,selectedListIds:['missing']}),['day-11']);
+});
+test('combines selected lists into one queue and excludes unchecked lists',()=>{
+  const cards=cardsForLists(testLists,['day-11','day-12']);
+  assert.equal(cards.length,8);
+  assert.equal(new Set(cards.map(c=>c.key)).size,8);
+  const queue=buildQueue(cards,{},100);
+  assert.deepEqual(new Set(queue.map(c=>c.listName)),new Set(['Day 11','Day 12']));
+  assert.ok(queue.every(c=>c.word.english!=='outside'));
+});
+test('identical chapter names stay separate across lists and respect direction filters',()=>{
+  const cards=cardsForLists(testLists,['day-11','day-12'],{chapters:[chapterKey('day-12','My words')],direction:'ko-en'});
+  assert.equal(cards.length,2);
+  assert.ok(cards.every(c=>c.listId==='day-12'&&c.direction==='ko-en'));
+  assert.equal(cardsForLists(testLists,['day-11'],{chapters:[]}).length,0);
+});
+test('existing review keys and schedules apply to the same cards after combining lists',()=>{
+  const progress={'day-11/My words:manage/en-ko':{level:2,due:50},'day-12/My words:ride/en-ko':{level:1,due:900}};
+  const queue=buildQueue(cardsForLists(testLists,['day-11','day-12'],{direction:'en-ko'}),progress,100,100);
+  assert.equal(queue[0].key,'day-11/My words:manage/en-ko');
+  assert.equal(queue.length,3);
+  assert.ok(queue.every(c=>c.key!=='day-12/My words:ride/en-ko'));
+  assert.equal(progress[queue[0].key].level,2);
 });

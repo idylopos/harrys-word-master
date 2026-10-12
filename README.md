@@ -22,8 +22,8 @@ npm test
 - Correct due reviews advance through 1, 3, 7, 14, 30, 60, and 90 days.
 - Incorrect answers and “I don’t know yet” reset the card to a 10-minute review; the next correct due review restarts at 1 day.
 - Correct early practice does not advance the schedule. Incorrect early practice resets the card.
-- On opening, overdue cards across all lists take priority. The Due reviews tab always includes older weekly lists.
-- A new round uses the selected list, chapters, and direction, with due cards before new cards.
+- On opening and when continuing a selected round, only checked word lists are included. Due cards take priority within that selection. The separate Due reviews tab includes all saved lists.
+- Check one or more Word Lists (for example, Day 11 and Day 12), then click “Start selected round” to shuffle them together. Chapter checkboxes are grouped by list, so identical chapter names do not collide. The selection is remembered across reloads and backups; old single-list selections migrate automatically without changing existing progress keys. Settings apply to the next round, so changing checkboxes does not interrupt the current card.
 - Any single listed Korean meaning is accepted. Matching ignores spacing and punctuation, allows omitted parenthetical qualifiers, and handles the supplied list’s obvious spelling variants. It does not use an AI semantic grader.
 
 ## Weekly imports and persistence

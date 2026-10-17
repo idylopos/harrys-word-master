@@ -1,9 +1,10 @@
-import { listSignature } from './core.js?v=6';
+import { listSignature } from './core.js?v=7';
 
 const maxBytes = 500000;
 const maxHashLength = 16000;
 
 function readPayload(payload) {
+  if (Array.isArray(payload?.words) && payload.words.length > 1000) throw new Error('Please split lists with more than 1,000 words before sharing or publishing.');
   if (!payload || payload.format !== 'harry-word-list' || payload.version !== 1 ||
       typeof payload.name !== 'string' || !payload.name.trim() || payload.name.length > 80 ||
       !Array.isArray(payload.words) || !payload.words.length || payload.words.length > 1000) {

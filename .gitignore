@@ -4,3 +4,5 @@ node_modules/
 .openai/
 .env
 .env.*
+
+__pycache__/

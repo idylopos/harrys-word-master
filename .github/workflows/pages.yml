@@ -24,6 +24,8 @@ jobs:
           node --check dist/app.js
           node --check dist/core.js
           node --check dist/sharing.js
+          node --check dist/catalog.js
+          node --check dist/catalog-config.js
           node --check dist/vocabulary.js
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v4

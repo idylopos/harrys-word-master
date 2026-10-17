@@ -114,9 +114,9 @@ export function schedule(previous, correct, now = Date.now()) {
   return { level, due: now + (correct ? intervals[level] * 86400000 : 600000), lastCorrect: correct, reviewedAt: now };
 }
 export function buildQueue(cards, progress, limit, now = Date.now(), early = false) {
-  const due = shuffle(cards.filter(c => progress[c.key]?.due <= now));
-  const fresh = shuffle(cards.filter(c => !progress[c.key]));
-  const later = early ? shuffle(cards.filter(c => progress[c.key]?.due > now)) : [];
+  const due = shuffle(cards.filter(c => progressForCard(progress, c)?.due <= now));
+  const fresh = shuffle(cards.filter(c => !progressForCard(progress, c)));
+  const later = early ? shuffle(cards.filter(c => progressForCard(progress, c)?.due > now)) : [];
   return [...due, ...fresh, ...later].slice(0, limit);
 }
 
@@ -132,15 +132,77 @@ export function chapterKey(listId, chapter) {
 }
 export function cardsForLists(lists, listIds, { chapters = null, direction = 'mixed' } = {}) {
   const selected = new Set(listIds), includedChapters = chapters === null ? null : new Set(chapters);
-  return lists.filter(list => selected.has(list.id)).flatMap(list => list.words
+  const cards = lists.filter(list => selected.has(list.id)).flatMap(list => list.words
     .filter(word => includedChapters === null || includedChapters.has(chapterKey(list.id, word.chapter)))
     .flatMap(word => ['en-ko', 'ko-en'].filter(d => direction === 'mixed' || d === direction)
       .map(d => ({ word, direction: d, key: `${list.id}/${word.id}/${d}`, listId: list.id, listName: list.name }))));
+  const unique = new Map();
+  for (const card of cards) {
+    const signature = `${wordSignature(card.word)}/${card.direction}`;
+    const previous = unique.get(signature);
+    if (previous) previous.aliases.push(card.key);
+    else unique.set(signature, { ...card, aliases: [card.key] });
+  }
+  return [...unique.values()];
 }
 
+export function wordSignature(word) {
+  return JSON.stringify([normalize(word.english), [...new Set(meanings(word.korean).map(normalize))].sort()]);
+}
 export function listSignature(list) {
-  return JSON.stringify(list.words.map(word => [normalize(word.english),
-    meanings(word.korean).map(normalize).sort()]).sort((a, b) => a[0].localeCompare(b[0])));
+  return JSON.stringify([...new Set(list.words.map(wordSignature))].sort());
+}
+
+function latestReview(a, b) {
+  if (!a) return b;
+  if (!b) return a;
+  const ageA = Number.isFinite(a.reviewedAt) ? a.reviewedAt : 0, ageB = Number.isFinite(b.reviewedAt) ? b.reviewedAt : 0;
+  if (ageA !== ageB) return ageA > ageB ? a : b;
+  // A tied or legacy record must not postpone a review that is already due.
+  if (a.due !== b.due) return a.due < b.due ? a : b;
+  return a.level <= b.level ? a : b;
+}
+export function progressForCard(progress, card) {
+  if (!card) return undefined;
+  return (card.aliases || [card.key]).reduce((record, key) => latestReview(record, progress[key]), undefined);
+}
+
+export function deduplicateState(state) {
+  const lists = [], bySignature = new Map(), aliases = new Map(), progress = { ...state.progress };
+  const archive = [...(state.duplicateListArchive || [])];
+  const transfer = (sourceList, sourceWord, targetList, targetWord) => {
+    for (const direction of ['en-ko', 'ko-en']) {
+      const source = `${sourceList.id}/${sourceWord.id}/${direction}`, target = `${targetList.id}/${targetWord.id}/${direction}`;
+      const record = latestReview(progress[target], progress[source]);
+      if (record) progress[target] = record;
+    }
+  };
+  for (const original of state.lists) {
+    const words = [], uniqueWords = new Map();
+    for (const word of original.words) {
+      const signature = wordSignature(word), previous = uniqueWords.get(signature);
+      if (previous) transfer(original, word, original, previous);
+      else { words.push(word); uniqueWords.set(signature, word); }
+    }
+    const list = words.length === original.words.length ? original : { ...original, words };
+    const signature = listSignature(list), existing = bySignature.get(signature);
+    if (existing) {
+      const targets = new Map(existing.words.map(word => [wordSignature(word), word]));
+      for (const word of list.words) transfer(list, word, existing, targets.get(wordSignature(word)));
+      const index = lists.indexOf(existing);
+      const merged = { ...existing };
+      for (const field of ['builtinId', 'catalogId']) if (!merged[field] && list[field]) merged[field] = list[field];
+      if (list.publishPending) merged.publishPending = true;
+      lists[index] = merged; bySignature.set(signature, merged);
+      aliases.set(list.id, merged.id); archive.push(original);
+    } else {
+      lists.push(list); bySignature.set(signature, list); aliases.set(list.id, list.id);
+      if (words.length !== original.words.length) archive.push(original);
+    }
+  }
+  const selectedListIds = [...new Set(resolveSelectedListIds(state).map(id => aliases.get(id) || id))];
+  return { ...state, lists, progress, selected: aliases.get(state.selected) || selectedListIds[0], selectedListIds,
+    ...(archive.length ? { duplicateListArchive: archive } : {}) };
 }
 
 // Add public vocabulary to each browser's private state. Reuse matching imports

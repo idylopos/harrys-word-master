@@ -42,7 +42,7 @@ For longer lists, choose **Download list file** and send the `.json` file. Recip
 
 Personal vocabulary, statistics, and schedules are stored in localStorage for this browser and origin. They do not sync across devices. Export a JSON backup from the footer and restore it on another device or on the published app. Restoring replaces the current local data after confirmation. Clearing browser storage removes this data.
 
-The site is static and has no server database or account system. Fonts use Google Fonts with system fallbacks. Scheduling uses the device clock and review dates use the browser’s timezone.
+The frontend is static and does not store learning progress on a server. An optional Supabase catalog holds only public vocabulary; account-based progress sync is not provided. Fonts use Google Fonts with system fallbacks. Scheduling uses the device clock and review dates use the browser’s timezone.
 
 ## Hosting
 
@@ -51,3 +51,15 @@ The public app is hosted on [GitHub Pages](https://idylopos.github.io/harrys-wor
 Static assets are in `dist/`. Every push to `main` runs the vocabulary and scheduling tests, checks JavaScript syntax, and deploys through `.github/workflows/pages.yml`. GitHub Pages must use GitHub Actions as its publishing source.
 
 Everyone can use the shared URL without logging in. Each visitor keeps their own uploaded lists and learning progress in their browser; these are not uploaded to GitHub or shared with other visitors. The 180 built-in words are included in the public app source; learning progress is private to each browser. Adding a personal list saves it locally; choosing Share lets you send its vocabulary through a dedicated link or list file. To move progress from the local preview to the published app, export a backup locally and restore it on the published URL.
+
+## Public catalog and duplicate cleanup
+
+Duplicate lists are consolidated by their complete normalized vocabulary, regardless of titles, chapter labels, or definition order. Repeated equivalent words are also removed from combined practice pools, separately for each direction. Different meanings remain distinct. Migration keeps the most recent review record (a recent miss wins over an older correct answer), preserves aggregate scores, and remaps selections. Original merged copies are retained in `duplicateListArchive` inside local backup data; old progress keys are not deleted.
+
+The public-catalog client, append-only database schema and setup script are prepared. **The backend is not yet provisioned:** automatic approval review requires explicit user approval to create the persistent Supabase project. `dist/catalog-config.js` remains blank, so no public upload is claimed or attempted. Link/file sharing and local duplicate cleanup remain available.
+
+Once configured, new Add word list uploads publish automatically. All visitors to the main URL load the public catalog and refresh it every 30 seconds while the app is open. Failed uploads stay queued locally and retry on reconnect or focus. Older browser-only lists are not silently published; their Publish button explicitly adds them to the shared catalog. Only titles and vocabulary are uploaded; scores and review schedules stay in each browser. Identical public submissions return the existing immutable catalog entry.
+
+The SQL migration in `catalog/migrations/` enables row-level security and grants anonymous visitors only read access plus a validated publishing RPC. There are no anonymous update/delete permissions. Payload sizes, entry counts, hourly publication volume and catalog capacity are bounded. Privileged credentials never belong in frontend configuration; only the intentionally public anon key is used there.
+
+After backend creation is explicitly approved, the maintainer can use the existing Supabase CLI login with `scripts/catalog-admin.py`: create the dedicated project in an approved free organization (`HARRY_CATALOG_ORG`), wait for it to become active, apply migrations, and write the anon configuration with `configure`. Commit that public configuration and redeploy. Live database migration, RLS checks and two-client catalog publishing still require verification after provisioning. Current catalog transport tests use a fake fetch service and do not imply a live backend exists.

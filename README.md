@@ -32,6 +32,14 @@ Paste a list or upload a UTF-8 TXT, CSV, TSV, or Markdown file. Plain English–
 
 Built-in lists are available to everyone with the URL, including returning visitors and people restoring older backups. Fresh browsers start with Day 11 and Day 12 selected. When an existing imported list matches a built-in list’s complete English–Korean contents, it is reused in place, preserving its IDs, title, selection, and review history. Custom or partial imports remain intact alongside the built-ins.
 
+## Share word lists
+
+After adding a list, click **Share** beside it under **Word Lists**, then **Copy link**. Send that generated link to another person. They preview its words and click **Add list & study** to save it without replacing their own lists, scores, or schedules. Reopening an equivalent list reuses the recipient's existing list and progress. Built-in lists can also be shared.
+
+Share links contain a vocabulary snapshot in the URL fragment, using versioned UTF-8 data with optional gzip compression. The shared data includes only the list title, English words, Korean meanings, and chapters; sender IDs and learning records are excluded. The generated link is specific to that list: the ordinary site URL does not automatically include personal uploads. Links do not update when the sender changes their local copy; create a new link to share changes.
+
+For longer lists, choose **Download list file** and send the `.json` file. Recipients open it through **Add word list → Choose a vocabulary file**, preview it, and choose **Add list & study**. This is a vocabulary-only import, separate from the full backup/restore flow. Sharing supports up to 1,000 words and 500 KB of decoded data; links have a 16,000-character cap and the file option handles lists too large for a link. Encoded input is validated and decompression output is bounded before preview or import.
+
 Personal vocabulary, statistics, and schedules are stored in localStorage for this browser and origin. They do not sync across devices. Export a JSON backup from the footer and restore it on another device or on the published app. Restoring replaces the current local data after confirmation. Clearing browser storage removes this data.
 
 The site is static and has no server database or account system. Fonts use Google Fonts with system fallbacks. Scheduling uses the device clock and review dates use the browser’s timezone.
@@ -42,4 +50,4 @@ The public app is hosted on [GitHub Pages](https://idylopos.github.io/harrys-wor
 
 Static assets are in `dist/`. Every push to `main` runs the vocabulary and scheduling tests, checks JavaScript syntax, and deploys through `.github/workflows/pages.yml`. GitHub Pages must use GitHub Actions as its publishing source.
 
-Everyone can use the shared URL without logging in. Each visitor keeps their own uploaded lists and learning progress in their browser; these are not uploaded to GitHub or shared with other visitors. The 180 built-in words are included in the public app source; learning progress is private to each browser. Adding a personal list through the app does not publish it. To move progress from the local preview to the published app, export a backup locally and restore it on the published URL.
+Everyone can use the shared URL without logging in. Each visitor keeps their own uploaded lists and learning progress in their browser; these are not uploaded to GitHub or shared with other visitors. The 180 built-in words are included in the public app source; learning progress is private to each browser. Adding a personal list saves it locally; choosing Share lets you send its vocabulary through a dedicated link or list file. To move progress from the local preview to the published app, export a backup locally and restore it on the published URL.

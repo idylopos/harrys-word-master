@@ -138,7 +138,7 @@ export function cardsForLists(lists, listIds, { chapters = null, direction = 'mi
       .map(d => ({ word, direction: d, key: `${list.id}/${word.id}/${d}`, listId: list.id, listName: list.name }))));
 }
 
-function listSignature(list) {
+export function listSignature(list) {
   return JSON.stringify(list.words.map(word => [normalize(word.english),
     meanings(word.korean).map(normalize).sort()]).sort((a, b) => a[0].localeCompare(b[0])));
 }

@@ -1,5 +1,6 @@
 import { initialText, day11Text, day12Text } from './vocabulary.js?v=5';
-import { parseList, isCorrect, schedule, buildQueue, meanings, resolveSelectedListIds, chapterKey, cardsForLists, mergeBuiltInLists } from './core.js?v=5';
+import { parseList, isCorrect, schedule, buildQueue, meanings, resolveSelectedListIds, chapterKey, cardsForLists, mergeBuiltInLists } from './core.js?v=6';
+import { encodeShareHash, decodeShareHash, sharedListFile, parseSharedListFile, addSharedList } from './sharing.js?v=6';
 const $ = s => document.querySelector(s);
 const escape = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const storageKey = 'harry-word-master-v1';
@@ -12,6 +13,7 @@ let state = { lists:[], selected:'builtin-day-11', selectedListIds:['builtin-day
 let storageAvailable = true;
 try { const saved = JSON.parse(localStorage.getItem(storageKey)); if (saved && Array.isArray(saved.lists) && saved.lists.length && saved.progress) state = saved; } catch { storageAvailable = false; }
 state = mergeBuiltInLists(state, builtIns);
+let sharingList = null, incomingList = null, shareRequest = 0, incomingRequest = 0;
 let view = 'practice', queue = [], position = 0, results = [], answered = false, current, timer, roundScope = 'selection';
 const selectedLists = () => state.lists.filter(l => resolveSelectedListIds(state).includes(l.id));
 const selectedWords = () => selectedLists().flatMap(l => l.words.map(word => ({word,listId:l.id,listName:l.name})));
@@ -35,7 +37,7 @@ function renderChapters(previous = new Map()) {
 function settings() {
  state.selectedListIds=resolveSelectedListIds(state);
  state.selected=state.selectedListIds[0]; // Preserve compatibility with older backups.
- $('#list-options').innerHTML=state.lists.map(l=>`<label class="list-choice"><input type="checkbox" value="${escape(l.id)}" ${state.selectedListIds.includes(l.id)?'checked':''}><span>${escape(l.name)}<small>${l.words.length} words${l.builtinId?' · Built-in':''}</small></span></label>`).join('');
+ $('#list-options').innerHTML=state.lists.map(l=>`<div class="list-entry"><label class="list-choice"><input type="checkbox" value="${escape(l.id)}" ${state.selectedListIds.includes(l.id)?'checked':''}><span>${escape(l.name)}<small>${l.words.length} words${l.builtinId?' · Built-in':''}</small></span></label><button type="button" class="list-share" data-share-list="${escape(l.id)}" aria-label="Share ${escape(l.name)}">Share ↗</button></div>`).join('');
  renderChapters(); stats();
 }
 function changeListSelection() {
@@ -108,17 +110,74 @@ function previewImport(){
   $('#import-preview').innerHTML=`<strong>${words.length} words found</strong>${words.length?`<details><summary>Review recognized words (${words.length})</summary><div class="import-words">${words.map(w=>`<div class="word-row"><strong>${escape(w.english)}</strong><span lang="ko">${escape(w.korean)}</span></div>`).join('')}</div></details>`:''}${skipped.length?`<p class="warning">${skipped.length} notes, unrecognized lines, or duplicates will be skipped.</p><details><summary>View skipped lines</summary>${skipped.map(s=>`Line ${s.line}: ${escape(s.text)}`).join('<br>')}</details>`:''}`;
   return {words,skipped};
 }
+async function openShare(listId) {
+ const list=state.lists.find(item=>item.id===listId);if(!list)return;
+ sharingList=list;const request=++shareRequest;
+ $('#share-list-name').textContent=`${list.name} · ${list.words.length} words`;
+ $('#share-link').value='';$('#share-feedback').textContent='Preparing your link…';$('#copy-share').disabled=true;
+ if(!$('#share-dialog').open)$('#share-dialog').showModal();
+ try {
+  const hash=await encodeShareHash(list);if(request!==shareRequest)return;
+  const url=new URL(location.pathname,location.origin);url.hash=hash;
+  $('#share-link').value=url.href;$('#copy-share').disabled=false;$('#share-feedback').textContent='Copy this link and send it to anyone you want to study with.';
+ } catch(error){if(request===shareRequest)$('#share-feedback').textContent=error.message;}
+}
+function previewSharedList(shared) {
+ incomingList=shared;
+ $('#incoming-list-name').textContent=shared.name;
+ $('#incoming-list-count').textContent=`${shared.words.length} words · vocabulary only`;
+ $('#incoming-words').innerHTML=shared.words.map(w=>`<div class="word-row"><div><strong>${escape(w.english)}</strong><small>${escape(w.chapter)}</small></div><span lang="ko">${escape(w.korean)}</span></div>`).join('');
+ $('#upload-dialog').close();$('#share-dialog').close();
+ if(!$('#incoming-dialog').open)$('#incoming-dialog').showModal();
+}
+function clearShareHash(){if(location.hash.startsWith('#share='))history.replaceState(null,'',`${location.pathname}${location.search}#${view}`);}
+async function handleHash() {
+ const hash=location.hash,request=++incomingRequest;
+ if(!hash.startsWith('#share=')){
+  if($('#incoming-dialog').open)$('#incoming-dialog').close();
+  const target=hash.slice(1);if(['practice','library','review'].includes(target))switchView(target);
+  return;
+ }
+ try {const shared=await decodeShareHash(hash);if(request===incomingRequest&&location.hash===hash)previewSharedList(shared);}
+ catch(error){if(request===incomingRequest){toast(error.message);clearShareHash();}}
+}
+async function copyShareLink() {
+ const link=$('#share-link').value;if(!link)return;
+ try {await navigator.clipboard.writeText(link);$('#share-feedback').textContent='Link copied. Send it to a friend to share this vocabulary list.';}
+ catch {$('#share-link').focus();$('#share-link').select();$('#share-feedback').textContent='Select and copy the link above to share it.';}
+}
+function downloadSharedList() {
+ if(!sharingList)return;
+ try {
+  const blob=new Blob([sharedListFile(sharingList)],{type:'application/json'}),url=URL.createObjectURL(blob),anchor=document.createElement('a');
+  anchor.href=url;anchor.download='harry-word-list.json';anchor.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+  $('#share-feedback').textContent='Send the downloaded file. Your friend can open it through Add word list.';
+ }catch(error){$('#share-feedback').textContent=error.message;}
+}
+function acceptSharedList() {
+ if(!incomingList)return;
+ try {
+  const oldCount=state.lists.length;
+  state=addSharedList(state,incomingList,crypto.randomUUID());settings();persist();
+  clearShareHash();$('#incoming-dialog').close();startRound();
+  toast(state.lists.length===oldCount?'This list is already saved. Your review progress is preserved.':'Shared list added. Your own progress starts here.');
+ }catch(error){toast(error.message);}
+}
 function openUpload(){$('#upload-dialog').showModal();$('#list-name').focus();}
 function exportBackup(){const blob=new Blob([JSON.stringify(state,null,2)],{type:'application/json'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='harry-vocabulary-backup.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
 function validateBackup(value){return value&&Array.isArray(value.lists)&&value.lists.length>0&&value.lists.every(l=>typeof l.id==='string'&&typeof l.name==='string'&&Array.isArray(l.words)&&l.words.length&&l.words.every(w=>['id','english','korean','chapter'].every(k=>typeof w[k]==='string')))&&value.progress&&typeof value.progress==='object'&&Object.values(value.progress).every(p=>p&&Number.isFinite(p.due)&&Number.isInteger(p.level)&&p.level>=-1&&p.level<=6)&&['attempts','correct','streak','best'].every(k=>Number.isFinite(value[k])&&value[k]>=0);}
 $('#upload-form').onsubmit=e=>{e.preventDefault();const {words}=previewImport();if(!words.length){toast('Add at least one English word with a Korean meaning.');return;}const item={id:crypto.randomUUID(),name:$('#list-name').value.trim(),words};if(!item.name)return;state.lists.push(item);state.selected=item.id;state.selectedListIds=[item.id];persist();settings();$('#upload-dialog').close();$('#upload-form').reset();$('#import-preview').textContent='';$('#file-name').textContent='or paste your list below';startRound();toast(`${words.length} words added. Let’s practice.`);};
-$('#file-input').onchange=async e=>{const file=e.target.files[0];if(!file)return;if(file.size>1000000){toast('Please choose a file smaller than 1 MB.');return;}try{$('#list-text').value=await file.text();$('#file-name').textContent=file.name;if(!$('#list-name').value)$('#list-name').value=file.name.replace(/\.[^.]+$/,'');previewImport();}catch{toast('Could not read that file. Try pasting the list.');}};
+$('#file-input').onchange=async e=>{const file=e.target.files[0];if(!file)return;if(file.size>1000000){toast('Please choose a file smaller than 1 MB.');return;}try{const text=await file.text();if(file.name.toLowerCase().endsWith('.json')){previewSharedList(parseSharedListFile(text));e.target.value='';return;}$('#list-text').value=text;$('#file-name').textContent=file.name;if(!$('#list-name').value)$('#list-name').value=file.name.replace(/\.[^.]+$/,'');previewImport();}catch(error){toast(file.name.toLowerCase().endsWith('.json')?error.message:'Could not read that file. Try pasting the list.');}};
 $('#list-text').oninput=previewImport;$('#close-upload').onclick=()=>$('#upload-dialog').close();
-$('#list-options').onchange=changeListSelection;$('#select-all-lists').onclick=()=>{document.querySelectorAll('#list-options input').forEach(input=>input.checked=true);changeListSelection();};$('#new-round').onclick=()=>startRound();$('#search').oninput=renderLibrary;
+$('#list-options').onchange=changeListSelection;$('#list-options').onclick=e=>{const button=e.target.closest('[data-share-list]');if(button)openShare(button.dataset.shareList);};$('#select-all-lists').onclick=()=>{document.querySelectorAll('#list-options input').forEach(input=>input.checked=true);changeListSelection();};$('#new-round').onclick=()=>startRound();$('#search').oninput=renderLibrary;
 for(const b of document.querySelectorAll('[data-view]'))b.onclick=()=>switchView(b.dataset.view);
 for(const b of document.querySelectorAll('[data-upload]'))b.onclick=openUpload;
 $('#backup').onclick=exportBackup;$('#restore').onclick=()=>$('#restore-file').click();$('#restore-file').onchange=async e=>{const file=e.target.files[0];if(!file)return;try{if(file.size>5000000)throw Error();const data=JSON.parse(await file.text());if(!validateBackup(data))throw Error();if(!confirm('Restore this backup? It will replace the lists and progress currently saved in this browser.'))return;state=mergeBuiltInLists(data,builtIns);settings();persist();startRound();toast('Backup restored.');}catch{toast('This is not a valid Word Master backup.');}finally{e.target.value='';}};
-window.addEventListener('hashchange',()=>{const target=location.hash.slice(1);if(['practice','library','review'].includes(target))switchView(target);});
+$('#close-share').onclick=()=>$('#share-dialog').close();$('#share-dialog').addEventListener('close',()=>{shareRequest++;});
+$('#copy-share').onclick=copyShareLink;$('#download-share').onclick=downloadSharedList;
+$('#close-incoming').onclick=()=>$('#incoming-dialog').close();$('#accept-incoming').onclick=acceptSharedList;
+$('#incoming-dialog').addEventListener('close',()=>{incomingList=null;incomingRequest++;clearShareHash();});
+window.addEventListener('hashchange',handleHash);
 window.addEventListener('focus',()=>{stats();if(view==='review')renderReview();});
 setInterval(()=>{stats();if(view==='review')renderReview();},60000);
-settings();persist();startRound();
+settings();persist();startRound();handleHash();

@@ -1,12 +1,17 @@
-import { initialText } from './vocabulary.js';
-import { parseList, isCorrect, schedule, buildQueue, meanings, resolveSelectedListIds, chapterKey, cardsForLists } from './core.js?v=4';
+import { initialText, day11Text, day12Text } from './vocabulary.js?v=5';
+import { parseList, isCorrect, schedule, buildQueue, meanings, resolveSelectedListIds, chapterKey, cardsForLists, mergeBuiltInLists } from './core.js?v=5';
 const $ = s => document.querySelector(s);
 const escape = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const storageKey = 'harry-word-master-v1';
 const seed = { id:'week-1', name:'This week · Chapters 7–10', words:parseList(initialText).words };
-let state = { lists:[seed], selected:seed.id, progress:{}, attempts:0, correct:0, streak:0, best:0 };
+const builtIns = [seed,
+ {id:'builtin-day-11',name:'Day 11 — Jobs & Work (0301–0330)',words:parseList(day11Text).words},
+ {id:'builtin-day-12',name:'Day 12 — City & Traffic (0331–0360)',words:parseList(day12Text).words}
+];
+let state = { lists:[], selected:'builtin-day-11', selectedListIds:['builtin-day-11','builtin-day-12'], progress:{}, attempts:0, correct:0, streak:0, best:0 };
 let storageAvailable = true;
 try { const saved = JSON.parse(localStorage.getItem(storageKey)); if (saved && Array.isArray(saved.lists) && saved.lists.length && saved.progress) state = saved; } catch { storageAvailable = false; }
+state = mergeBuiltInLists(state, builtIns);
 let view = 'practice', queue = [], position = 0, results = [], answered = false, current, timer, roundScope = 'selection';
 const selectedLists = () => state.lists.filter(l => resolveSelectedListIds(state).includes(l.id));
 const selectedWords = () => selectedLists().flatMap(l => l.words.map(word => ({word,listId:l.id,listName:l.name})));
@@ -30,7 +35,7 @@ function renderChapters(previous = new Map()) {
 function settings() {
  state.selectedListIds=resolveSelectedListIds(state);
  state.selected=state.selectedListIds[0]; // Preserve compatibility with older backups.
- $('#list-options').innerHTML=state.lists.map(l=>`<label class="list-choice"><input type="checkbox" value="${escape(l.id)}" ${state.selectedListIds.includes(l.id)?'checked':''}><span>${escape(l.name)}<small>${l.words.length} words</small></span></label>`).join('');
+ $('#list-options').innerHTML=state.lists.map(l=>`<label class="list-choice"><input type="checkbox" value="${escape(l.id)}" ${state.selectedListIds.includes(l.id)?'checked':''}><span>${escape(l.name)}<small>${l.words.length} words${l.builtinId?' · Built-in':''}</small></span></label>`).join('');
  renderChapters(); stats();
 }
 function changeListSelection() {
@@ -112,7 +117,7 @@ $('#list-text').oninput=previewImport;$('#close-upload').onclick=()=>$('#upload-
 $('#list-options').onchange=changeListSelection;$('#select-all-lists').onclick=()=>{document.querySelectorAll('#list-options input').forEach(input=>input.checked=true);changeListSelection();};$('#new-round').onclick=()=>startRound();$('#search').oninput=renderLibrary;
 for(const b of document.querySelectorAll('[data-view]'))b.onclick=()=>switchView(b.dataset.view);
 for(const b of document.querySelectorAll('[data-upload]'))b.onclick=openUpload;
-$('#backup').onclick=exportBackup;$('#restore').onclick=()=>$('#restore-file').click();$('#restore-file').onchange=async e=>{const file=e.target.files[0];if(!file)return;try{if(file.size>5000000)throw Error();const data=JSON.parse(await file.text());if(!validateBackup(data))throw Error();if(!confirm('Restore this backup? It will replace the lists and progress currently saved in this browser.'))return;state=data;settings();persist();startRound();toast('Backup restored.');}catch{toast('This is not a valid Word Master backup.');}finally{e.target.value='';}};
+$('#backup').onclick=exportBackup;$('#restore').onclick=()=>$('#restore-file').click();$('#restore-file').onchange=async e=>{const file=e.target.files[0];if(!file)return;try{if(file.size>5000000)throw Error();const data=JSON.parse(await file.text());if(!validateBackup(data))throw Error();if(!confirm('Restore this backup? It will replace the lists and progress currently saved in this browser.'))return;state=mergeBuiltInLists(data,builtIns);settings();persist();startRound();toast('Backup restored.');}catch{toast('This is not a valid Word Master backup.');}finally{e.target.value='';}};
 window.addEventListener('hashchange',()=>{const target=location.hash.slice(1);if(['practice','library','review'].includes(target))switchView(target);});
 window.addEventListener('focus',()=>{stats();if(view==='review')renderReview();});
 setInterval(()=>{stats();if(view==='review')renderReview();},60000);

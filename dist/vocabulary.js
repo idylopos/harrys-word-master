@@ -122,3 +122,65 @@ pronounce 1.발음하다 2.선언하다
 demonstrate 1.보여주다,설명하다 2.증명하다 3.시위하다
 play a role in ~에서 역할을 하다
 go over 1.검토하다, 조사하다 2.건너가다.`;
+
+export const day11Text = `manage 운영하다, 관리하다
+hire 고용하다
+labor 노동, 일
+firm 회사, 단단한, 확고한
+attach 첨부하다, 붙이다
+department 부서, 학과
+career 직업, 경력, 이력
+detail 세부 사항, 열거하다
+employ 고용하다, (물건·기술 등을) 사용하다
+purpose 목적, 의도
+perform 수행하다, 실행하다, 공연하다
+agency 대행사, 대리점, 기관, 단체
+appoint 임명하다, 지명하다, (시간·장소 등을) 약속하다
+succeed 성공하다, 잘 되다, 뒤를 잇다, 계승하다
+operate 영업하다, 작동하다
+associate 동료, 연상하다, 결부시키다
+profession 직업, 전문직
+expert 전문가, 전문가의, 전문적인
+document 문서, 서류, 기록하다, 문서를 첨부하다
+deal with 처리하다, 다루다
+obtain 얻다, 획득하다
+illustrate 보여주다, 설명하다, 삽화를 넣다
+achieve 달성하다, 이루다
+confirm 확인하다, 확정하다, 승인하다
+distribute 유통시키다, 분배하다
+superior 상급의, 우수한
+retire 은퇴하다, 은퇴시키다
+assign 배치하다, 할당하다, 임명하다
+look forward to ~을 고대하다
+carry out 수행하다, 실행하다`;
+
+export const day12Text = `ride 타다, 몰다
+vehicle 차량, 운송 수단
+passenger 승객
+traffic 교통(량)
+aboard ~을 타고, 탑승하여
+path (좁은) 길, 산책로, 방향, 행로
+crosswalk 횡단보도
+delivery 배송, 배달
+connect 연결하다, 연결되다
+avenue 거리, 대로
+distance 거리, 간격, 먼 곳
+license 면허(증), 허가(증)
+downtown 중심가, 도심, 중심가의, 도심의, 중심가에, 도심에
+destination 목적지, 행선지
+row 배를 젓다, (늘어선) 줄, 열
+transfer 환승하다, 이동하다, 이동시키다
+distant (거리가) 먼, 떨어진
+convenient 편리한, 간편한
+intersection 교차로
+be afraid of ~을 무서워하다
+district 구역, 지구
+facility 시설, 설비
+fasten 매다, 고정시키다
+transportation 교통 수단, 수송, 운송
+pedestrian 보행자
+complicated 복잡한
+structure 구조, 체계, 구조물, 건물
+extend 확장하다, 연장하다
+be likely to ~할 가능성이 크다, ~할 것 같다
+bring about 야기하다, 초래하다`;

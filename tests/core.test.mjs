@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {parseList,isCorrect,schedule,buildQueue,resolveSelectedListIds,chapterKey,cardsForLists} from '../dist/core.js';
-import {initialText} from '../dist/vocabulary.js';
+import {parseList,isCorrect,schedule,buildQueue,resolveSelectedListIds,chapterKey,cardsForLists,mergeBuiltInLists} from '../dist/core.js';
+import {initialText,day11Text,day12Text} from '../dist/vocabulary.js';
 const words=parseList(initialText).words;
 test('all 120 supplied words and 4 chapter headings parse without dropped lines',()=>{assert.equal(words.length,120);assert.equal(parseList(initialText).skipped.length,0);for(const chapter of [7,8,9,10])assert.equal(words.filter(w=>w.chapter===`Chapter ${chapter}`).length,30);assert.equal(words.find(w=>w.english==='peer').korean,'1. 또래, 친구, 2.동료');});
 test('any listed meaning, optional parentheses, spacing and punctuation work',()=>{for(const [english,answer] of [['trim','다듬다'],['trim','손질하다'],['grab','먹다'],['roast','볶다'],['condition','조건'],['by oneself','혼자힘으로'],['sew','을 꿰매다']])assert.equal(isCorrect(answer,words.find(w=>w.english===english),'en-ko'),true,english);assert.equal(isCorrect('다듬',words.find(w=>w.english==='trim'),'en-ko'),false);assert.equal(isCorrect('TRIM.',words.find(w=>w.english==='trim'),'ko-en'),true);assert.equal(isCorrect('',words[0],'en-ko'),false);});
@@ -82,4 +82,72 @@ test('existing review keys and schedules apply to the same cards after combining
   assert.equal(queue.length,3);
   assert.ok(queue.every(c=>c.key!=='day-12/My words:ride/en-ko'));
   assert.equal(progress[queue[0].key].level,2);
+});
+
+const publicDays = [
+  {id:'builtin-day-11',name:'Day 11 — Jobs & Work (0301–0330)',words:parseList(day11Text).words},
+  {id:'builtin-day-12',name:'Day 12 — City & Traffic (0331–0360)',words:parseList(day12Text).words}
+];
+const emptyLearner = () => ({lists:[],progress:{},selected:'builtin-day-11',selectedListIds:['builtin-day-11','builtin-day-12'],attempts:0,correct:0,streak:0,best:0});
+test('both public day lists include all 30 supplied words and meanings',()=>{
+  assert.equal(parseList(day11Text).skipped.length,0);
+  assert.equal(parseList(day12Text).skipped.length,0);
+  assert.equal(publicDays[0].words.length,30);
+  assert.equal(publicDays[1].words.length,30);
+  assert.equal(publicDays[0].words[0].english,'manage');
+  assert.equal(publicDays[0].words[29].english,'carry out');
+  assert.equal(publicDays[1].words[0].english,'ride');
+  assert.equal(publicDays[1].words[29].english,'bring about');
+  assert.equal(publicDays[0].words.find(w=>w.english==='employ').korean,'고용하다, (물건·기술 등을) 사용하다');
+  assert.equal(publicDays[1].words.find(w=>w.english==='be likely to').korean,'~할 가능성이 크다, ~할 것 같다');
+});
+test('fresh learners get both day lists with separate private progress and copies of vocabulary',()=>{
+  const a=mergeBuiltInLists(emptyLearner(),publicDays), b=mergeBuiltInLists(emptyLearner(),publicDays);
+  assert.equal(a.lists.length,2);
+  assert.equal(cardsForLists(a.lists,resolveSelectedListIds(a)).length,120);
+  const key=cardsForLists(a.lists,resolveSelectedListIds(a))[0].key;
+  a.progress[key]=schedule(undefined,true,100);
+  a.attempts++;
+  assert.deepEqual(b.progress,{});
+  assert.equal(b.attempts,0);
+  assert.notEqual(a.lists[0].words[0],b.lists[0].words[0]);
+  assert.ok(a.lists.every(l=>l.builtinId===l.id));
+});
+test('returning learners and old backups receive missing built-ins once without losing private lists or scores',()=>{
+  const old={...emptyLearner(),lists:[{id:'custom',name:'My own list',words:parseList('extra 추가의').words}],selected:'custom',selectedListIds:['custom'],progress:{'custom/My words:extra/en-ko':{level:2,due:900}},attempts:7,correct:5};
+  const snapshot=JSON.stringify(old);
+  const upgraded=mergeBuiltInLists(old,publicDays);
+  assert.equal(upgraded.lists.length,3);
+  assert.equal(upgraded.lists[0],old.lists[0]);
+  assert.deepEqual(upgraded.progress,old.progress);
+  assert.deepEqual(upgraded.selectedListIds,['custom']);
+  assert.equal(upgraded.attempts,7);
+  assert.equal(upgraded.correct,5);
+  assert.equal(mergeBuiltInLists(upgraded,publicDays).lists.length,3);
+  assert.equal(JSON.stringify(old),snapshot);
+});
+test('matching imports keep their IDs, chapters, titles, selection and both directional review schedules',()=>{
+  const imported={id:'uploaded-uuid',name:'My Day11',words:publicDays[0].words.map(w=>({...w,id:`Chapter 11:${w.english}`,chapter:'Chapter 11',korean:w.korean.replace('회사, 단단한','회사 / 단단한')}))};
+  const originalKey='uploaded-uuid/Chapter 11:manage/en-ko', reverseKey='uploaded-uuid/Chapter 11:manage/ko-en';
+  const old={...emptyLearner(),lists:[imported],selected:'uploaded-uuid',selectedListIds:['uploaded-uuid'],progress:{[originalKey]:{level:3,due:800},[reverseKey]:{level:1,due:900}}};
+  const upgraded=mergeBuiltInLists(old,publicDays);
+  assert.equal(upgraded.lists.length,2);
+  assert.equal(upgraded.lists[0].id,'uploaded-uuid');
+  assert.equal(upgraded.lists[0].name,'My Day11');
+  assert.equal(upgraded.lists[0].builtinId,'builtin-day-11');
+  assert.deepEqual(upgraded.lists[0].words,imported.words);
+  assert.deepEqual(resolveSelectedListIds(upgraded),['uploaded-uuid']);
+  const cards=cardsForLists(upgraded.lists,['uploaded-uuid']);
+  assert.equal(upgraded.progress[cards.find(c=>c.key===originalKey).key].level,3);
+  assert.equal(upgraded.progress[cards.find(c=>c.key===reverseKey).key].level,1);
+});
+test('partial or customized imports are preserved instead of being replaced by public lists',()=>{
+  const partial={id:'partial',name:'Day 11',words:publicDays[0].words.slice(0,21)};
+  const edited={id:'edited',name:'Day 12',words:publicDays[1].words.map((w,i)=>i===0?{...w,korean:'나만의 뜻'}:w)};
+  const upgraded=mergeBuiltInLists({...emptyLearner(),lists:[partial,edited]},publicDays);
+  assert.equal(upgraded.lists.length,4);
+  assert.equal(upgraded.lists[0],partial);
+  assert.equal(upgraded.lists[1],edited);
+  assert.equal(upgraded.lists[2].words.length,30);
+  assert.equal(upgraded.lists[3].words.length,30);
 });

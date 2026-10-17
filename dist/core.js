@@ -137,3 +137,21 @@ export function cardsForLists(lists, listIds, { chapters = null, direction = 'mi
     .flatMap(word => ['en-ko', 'ko-en'].filter(d => direction === 'mixed' || d === direction)
       .map(d => ({ word, direction: d, key: `${list.id}/${word.id}/${d}`, listId: list.id, listName: list.name }))));
 }
+
+function listSignature(list) {
+  return JSON.stringify(list.words.map(word => [normalize(word.english),
+    meanings(word.korean).map(normalize).sort()]).sort((a, b) => a[0].localeCompare(b[0])));
+}
+
+// Add public vocabulary to each browser's private state. Reuse matching imports
+// in place, retaining their list/word IDs and therefore all existing SRS keys.
+export function mergeBuiltInLists(state, builtIns) {
+  const lists = [...state.lists];
+  for (const builtIn of builtIns) {
+    const signature = listSignature(builtIn);
+    const index = lists.findIndex(list => list.id === builtIn.id || list.builtinId === builtIn.id || listSignature(list) === signature);
+    if (index >= 0) lists[index] = { ...lists[index], builtinId: builtIn.id };
+    else lists.push({ ...builtIn, builtinId: builtIn.id, words: builtIn.words.map(word => ({ ...word })) });
+  }
+  return { ...state, lists };
+}
